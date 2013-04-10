@@ -2,8 +2,15 @@
     "name": "waitfor",
     "version": "0.1.1",
     "pm": "npm",
-    "main": "./lib/waitfor.js",
+    "publish": true,
+    "main": "./waitfor.js",
     "dependencies": {
     	"setimmediate": "~1.0.1"
-    }
+    },
+	"devDependencies": {
+        "mocha": "~1.8.2"
+	},
+	"scripts": {
+		"test": "make test"
+	}
 }
