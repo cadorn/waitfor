@@ -1,146 +1,168 @@
 
-require("setimmediate");
+((function() {
 
+    function Waitfor(exports) {
 
-var waitForTracker = {};
+        var waitForTracker = {};
 
-
-exports.serial = function(callback) {
-    var id = new Date().getTime();
-    var running = false;
-    var queue = [];
-    var error = undefined;
-    return function waitFor() {
-        function runOrQueueWorker(name, args) {
-            if (running === false) {
-                runWorker(name, args);
-            }
-            else {
-                queue.push(function() {
-                    runWorker(name, args);
-                });
-            }
-        }
-        function runWorker(name, args) {
-            running = true;
-            var worker = args.pop();
-            args.push(function(cont) {
-                waitForTracker[id][name] = "done";
-                if (cont === false) {
-                    queue = [];
-                    running = false;
-                    callback(error);
+        exports.serial = function(callback) {
+            var id = new Date().getTime();
+            var running = false;
+            var queue = [];
+            var error = undefined;
+            return function waitFor() {
+                function runOrQueueWorker(name, args) {
+                    if (running === false) {
+                        runWorker(name, args);
+                    }
+                    else {
+                        queue.push(function() {
+                            runWorker(name, args);
+                        });
+                    }
+                }
+                function runWorker(name, args) {
+                    running = true;
+                    var worker = args.pop();
+                    args.push(function(cont) {
+                        waitForTracker[id][name] = "done";
+                        if (cont === false) {
+                            queue = [];
+                            running = false;
+                            callback(error);
+                        } else
+                        if(typeof cont === "undefined" || cont === true || cont === null) {
+                            if (queue.length > 0) {
+                                queue.shift()();
+                            } else {
+                                running = false;
+                                if(callback) callback(error);
+                            }
+                        } else {
+                            error = cont;
+                            if (callback) {
+                                callback(error);
+                                callback = false;
+                            }
+                        }
+                    });
+                    if (!waitForTracker[id]) {
+                        waitForTracker[id] = {};
+                    }
+                    waitForTracker[id][name] = "pending";
+                    exports.setImmediate(function() {
+                        try {
+                            worker.apply(null, args);
+                        } catch(err) {
+                            args[args.length-1](err);
+                        }
+                    });
+                }
+                var args = [];
+                for (var i in arguments) {
+                    args.push(arguments[i]);
+                }
+                if (args.length === 0) {
+                    if (running === false && callback) {
+                        callback(error);
+                    }
                 } else
-                if(typeof cont === "undefined" || cont === true || cont === null) {
-                    if (queue.length > 0) {
-                        queue.shift()();
-                    } else {
-                        running = false;
-                        if(callback) callback(error);
+                if (args.length === 1 && typeof args[0] === "string") {
+                    return function waitFor() {
+                        var args1 = [];
+                        for (var i in arguments) {
+                            args1.push(arguments[i]);
+                        }
+                        runOrQueueWorker(args[0], args1);
                     }
                 } else {
-                    error = cont;
-                    if (callback) {
+                    runOrQueueWorker(new Date().getTime(), args);
+                }
+            };    
+        }
+
+
+        exports.parallel = function(callback) {
+            var id = new Date().getTime();
+            var c = 0;
+            var error = undefined;
+            return function waitFor() {
+                function runWorker(name, args) {
+                    var worker = args.pop();
+                    args.push(function(err) {
+                        if (err) {
+                            error = err;
+                            if (typeof error === "object") {
+                                if (!error.stack) error.stack = new Error(error.message + " (occurred somewhere prior to this stack)").stack;
+                            } else {
+                                error = new Error(JSON.stringify(error) + " (occurred somewhere prior to this stack)");
+                            }
+                        }
+                        c -= 1;
+                        waitForTracker[id][name] = "done";
+                        if (c === 0 && callback) {
+                            callback(error);
+                            callback = false;
+                        } else
+                        if (error && callback) {
+                            callback(error);
+                            callback = false;
+                        }
+                    });
+                    c += 1;
+                    if (!waitForTracker[id]) {
+                        waitForTracker[id] = {};
+                    }
+                    waitForTracker[id][name] = "pending";
+                    exports.setImmediate(function() {
+                        try {
+                            worker.apply(null, args);
+                        } catch(err) {
+                            args[args.length-1](err);
+                        }
+                    });
+                }
+                var args = [];
+                for (var i in arguments) {
+                    args.push(arguments[i]);
+                }
+                if (args.length === 0) {
+                    if (c === 0 && callback) {
                         callback(error);
-                        callback = false;
                     }
-                }
-            });
-            if (!waitForTracker[id]) {
-                waitForTracker[id] = {};
-            }
-            waitForTracker[id][name] = "pending";
-            setImmediate(function() {
-                try {
-                    worker.apply(null, args);
-                } catch(err) {
-                    args[args.length-1](err);
-                }
-            });
-        }
-        var args = [];
-        for (var i in arguments) {
-            args.push(arguments[i]);
-        }
-        if (args.length === 0) {
-            if (running === false && callback) {
-                callback(error);
-            }
-        } else
-        if (args.length === 1 && typeof args[0] === "string") {
-            return function waitFor() {
-                var args1 = [];
-                for (var i in arguments) {
-                    args1.push(arguments[i]);
-                }
-                runOrQueueWorker(args[0], args1);
-            }
-        } else {
-            runOrQueueWorker(new Date().getTime(), args);
-        }
-    };    
-}
-
-
-exports.parallel = function(callback) {
-    var id = new Date().getTime();
-    var c = 0;
-    var error = undefined;
-    return function waitFor() {
-        function runWorker(name, args) {
-            var worker = args.pop();
-            args.push(function(err) {
-                if (err) {
-                    error = err;
-                    if (typeof error === "object") {
-                        if (!error.stack) error.stack = new Error(error.message + " (occurred somewhere prior to this stack)").stack;
-                    } else {
-                        error = new Error(JSON.stringify(error) + " (occurred somewhere prior to this stack)");
-                    }
-                }
-                c -= 1;
-                waitForTracker[id][name] = "done";
-                if (c === 0 && callback) {
-                    callback(error);
-                    callback = false;
                 } else
-                if (error && callback) {
-                    callback(error);
-                    callback = false;
+                if (args.length === 1 && typeof args[0] === "string") {
+                    return function waitFor() {
+                        var args1 = [];
+                        for (var i in arguments) {
+                            args1.push(arguments[i]);
+                        }
+                        runWorker(args[0], args1);
+                    }
+                } else {
+                    runWorker(new Date().getTime(), args);
                 }
-            });
-            c += 1;
-            if (!waitForTracker[id]) {
-                waitForTracker[id] = {};
-            }
-            waitForTracker[id][name] = "pending";
-            setImmediate(function() {
-                try {
-                    worker.apply(null, args);
-                } catch(err) {
-                    args[args.length-1](err);
+            };    
+        }
+    }
+
+    // Check for AMD
+    if (typeof define === "function") {
+        define(function() {
+            var exports = {
+                setImmediate: function(callback) {
+                    return setTimeout(callback, 0);
                 }
-            });
-        }
-        var args = [];
-        for (var i in arguments) {
-            args.push(arguments[i]);
-        }
-        if (args.length === 0) {
-            if (c === 0 && callback) {
-                callback(error);
-            }
-        } else
-        if (args.length === 1 && typeof args[0] === "string") {
-            return function waitFor() {
-                var args1 = [];
-                for (var i in arguments) {
-                    args1.push(arguments[i]);
-                }
-                runWorker(args[0], args1);
-            }
-        } else {
-            runWorker(new Date().getTime(), args);
-        }
-    };    
-}
+            };
+            Waitfor(exports);
+            return exports;
+        });
+    } else
+    // Assume NodeJS
+    if (typeof exports === "object") {
+        require("setimmediate");
+        exports.setImmediate = setImmediate;
+        Waitfor(exports);
+    }
+
+})());
