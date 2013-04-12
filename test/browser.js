@@ -1,29 +1,35 @@
 
 const ASSERT = require("assert");
-const grunt = require("grunt");
+const GRUNT = require("grunt");
 
 
 describe("waitfor (browser)", function() {
 
     it("should run tests", function(done) {
 
-        // TODO: The code below should run the browser tests.
-        //       The tests do not seem to be called.
-        //       If run via `../Gruntfile.js` they run but fail.
-        //       If `./browser/runner.html` is run in browser all tests pass.
-
-        return done(null);
-
-        grunt.initConfig({
+        GRUNT.initConfig({
             mocha: {
-                all: [ "test/browser/runner.html" ]
+                all: {
+                    options: {
+                        reporter: "List"
+                    },
+                    src: [
+                        "test/browser/runner.html"
+                    ]
+                }
             }
         });
 
-        grunt.loadNpmTasks("grunt-mocha");
+        GRUNT.loadNpmTasks("grunt-mocha");
 
-        grunt.task.run("mocha");
-
+        GRUNT.registerInitTask('default', function() {
+            GRUNT.task.run(["mocha"]);
+        });
+        GRUNT.tasks(['default'], {
+            //debug: true
+        }, function() {
+            return done(null);
+        });
     });
 
 });

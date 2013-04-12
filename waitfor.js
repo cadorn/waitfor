@@ -3,7 +3,8 @@
 
     function Waitfor(exports) {
 
-        var waitForTracker = {};
+        var status = {};
+        exports._status = status;
 
         exports.serial = function(callback) {
             var id = new Date().getTime();
@@ -25,7 +26,7 @@
                     running = true;
                     var worker = args.pop();
                     args.push(function(cont) {
-                        waitForTracker[id][name] = "done";
+                        status[id][name] = "done";
                         if (cont === false) {
                             queue = [];
                             running = false;
@@ -46,10 +47,10 @@
                             }
                         }
                     });
-                    if (!waitForTracker[id]) {
-                        waitForTracker[id] = {};
+                    if (!status[id]) {
+                        status[id] = {};
                     }
-                    waitForTracker[id][name] = "pending";
+                    status[id][name] = "pending";
                     exports.setImmediate(function() {
                         try {
                             worker.apply(null, args);
@@ -58,10 +59,7 @@
                         }
                     });
                 }
-                var args = [];
-                for (var i in arguments) {
-                    args.push(arguments[i]);
-                }
+                var args = Array.prototype.slice.call(arguments);
                 if (args.length === 0) {
                     if (running === false && callback) {
                         callback(error);
@@ -69,11 +67,7 @@
                 } else
                 if (args.length === 1 && typeof args[0] === "string") {
                     return function waitFor() {
-                        var args1 = [];
-                        for (var i in arguments) {
-                            args1.push(arguments[i]);
-                        }
-                        runOrQueueWorker(args[0], args1);
+                        runOrQueueWorker(args[0], Array.prototype.slice.call(arguments));
                     }
                 } else {
                     runOrQueueWorker(new Date().getTime(), args);
@@ -99,7 +93,7 @@
                             }
                         }
                         c -= 1;
-                        waitForTracker[id][name] = "done";
+                        status[id][name] = "done";
                         if (c === 0 && callback) {
                             callback(error);
                             callback = false;
@@ -110,10 +104,10 @@
                         }
                     });
                     c += 1;
-                    if (!waitForTracker[id]) {
-                        waitForTracker[id] = {};
+                    if (!status[id]) {
+                        status[id] = {};
                     }
-                    waitForTracker[id][name] = "pending";
+                    status[id][name] = "pending";
                     exports.setImmediate(function() {
                         try {
                             worker.apply(null, args);
@@ -122,10 +116,7 @@
                         }
                     });
                 }
-                var args = [];
-                for (var i in arguments) {
-                    args.push(arguments[i]);
-                }
+                var args = Array.prototype.slice.call(arguments);
                 if (args.length === 0) {
                     if (c === 0 && callback) {
                         callback(error);
@@ -133,11 +124,7 @@
                 } else
                 if (args.length === 1 && typeof args[0] === "string") {
                     return function waitFor() {
-                        var args1 = [];
-                        for (var i in arguments) {
-                            args1.push(arguments[i]);
-                        }
-                        runWorker(args[0], args1);
+                        runWorker(args[0], Array.prototype.slice.call(arguments));
                     }
                 } else {
                     runWorker(new Date().getTime(), args);
